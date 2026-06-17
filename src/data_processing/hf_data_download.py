@@ -26,9 +26,6 @@ class DataDownload:
 
 if __name__ == "__main__":
     dd = DataDownload()
-
     my_dataset = dd()
-
     print("Dataset Structure:\n", my_dataset)
-
     print(my_dataset["train"][0])
