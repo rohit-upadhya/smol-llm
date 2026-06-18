@@ -16,7 +16,7 @@ class DataDownload:
         self,
         dataset_name: str,
     ):
-        return load_dataset(dataset_name)
+        return load_dataset(dataset_name, cache_dir="resources/")
 
     def __call__(
         self,
