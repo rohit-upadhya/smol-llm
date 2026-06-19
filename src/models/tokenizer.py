@@ -1,7 +1,7 @@
 from tokenizers import Tokenizer as HFTokenizer
 from tokenizers.models import BPE
-from tokenizers.trainers import BPETrainer
-from tokenizers.pre_tokenizer import Whitespace
+from tokenizers.trainers import BpeTrainer
+from tokenizers.pre_tokenizers import Whitespace
 import os
 
 
@@ -23,14 +23,23 @@ class SmoLMTokenizer:
 
     def train(
         self,
-        file_paths: list[str],
+        hf_dataset,
     ):
-        trainer = BPETrainer(
+        trainer = BpeTrainer(
             vocab_size=self.vocab_size,
             special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
         )
-        self.tokenizer.train(files=file_paths, trainer=trainer)
+
+        def batch_iterator(
+            batch_size=10000,
+        ):
+            for i in range(0, len(hf_dataset), batch_size):
+                yield hf_dataset[i : i + batch_size]["text"]
+            pass
+
+        self.tokenizer.train_from_iterator(batch_iterator(), trainer=trainer)
         self.tokenizer.save(self.model_path)
+        print(f"Tokenizer saved to {self.model_path}.")
 
     def encode(
         self,
@@ -43,3 +52,12 @@ class SmoLMTokenizer:
         token_ids: list[int],
     ) -> str:
         return self.tokenizer.decode(token_ids)
+
+    def load_or_train(
+        self,
+        hf_dataset,
+    ):
+        if not os.path.exists(self.model_path):
+            print("Printing tokenizer.")
+            self.train(hf_dataset=hf_dataset)
+        print("Tokenizer loaded.")

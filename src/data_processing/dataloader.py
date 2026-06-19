@@ -23,7 +23,7 @@ class SmolLMDataLoader:
         self,
         idx,
     ):
-        text = self.dataset[idx]["text"]
+        text = self.dataset["train"][idx]["text"]
 
         input_ids = self.smollm_tokenizer.encode(text)
 
@@ -34,7 +34,7 @@ class SmolLMDataLoader:
             padding_length = self.max_length - len(input_ids)
             input_ids = input_ids + [self.pad_token_id] * padding_length
 
-        tensor_ids = torch.tesor(input_ids)
+        tensor_ids = torch.tensor(input_ids)
 
         return {"input_ids": tensor_ids, "label": tensor_ids.clone()}
 
