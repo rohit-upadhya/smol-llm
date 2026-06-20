@@ -1,8 +1,9 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
 
 
-class SmolLMDataLoader:
+class SmoLLMDataLoader:
     def __init__(
         self,
         hf_dataset,
@@ -30,13 +31,35 @@ class SmolLMDataLoader:
         if len(input_ids) > self.max_length:
             input_ids = input_ids[: self.max_length]
 
-        else:
-            padding_length = self.max_length - len(input_ids)
-            input_ids = input_ids + [self.pad_token_id] * padding_length
-
         tensor_ids = torch.tensor(input_ids)
 
-        return {"input_ids": tensor_ids, "label": tensor_ids.clone()}
+        return {"input_ids": tensor_ids, "labels": tensor_ids.clone()}
+
+
+class SmoLLMCollate:
+    def __init__(
+        self,
+        pad_token_id: int,
+    ):
+        self.pad_token_id = pad_token_id
+
+    def __call__(
+        self,
+        batch,
+    ):
+        input_ids = [item["input_ids"] for item in batch]
+        labels = [item["labels"] for item in batch]
+
+        input_ids_padded = pad_sequence(
+            input_ids, batch_first=True, padding_value=self.pad_token_id
+        )
+
+        labels_padded = pad_sequence(labels, batch_first=True, padding_value=-100)
+
+        return {
+            "input_ids": input_ids_padded,
+            "labels": labels_padded,
+        }
 
 
 def create_dateset(
@@ -45,13 +68,15 @@ def create_dateset(
     max_length: int = 512,
     batch_size: int = 8,
 ):
-    dataset = SmolLMDataLoader(
+    dataset = SmoLLMDataLoader(
         hf_dataset=hf_dataset, tokenizer=tokenizer, max_length=max_length
     )
+    collate_fn = SmoLLMCollate(pad_token_id=dataset.pad_token_id)
     return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
+        collate_fn=collate_fn,
     )

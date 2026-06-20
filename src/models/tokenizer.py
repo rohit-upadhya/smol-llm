@@ -5,7 +5,7 @@ from tokenizers.pre_tokenizers import Whitespace
 import os
 
 
-class SmoLMTokenizer:
+class SmoLLMTokenizer:
     def __init__(
         self,
         vocab_size: int = 32000,
