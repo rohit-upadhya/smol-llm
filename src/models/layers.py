@@ -77,3 +77,34 @@ class RMSNorm(nn.Module):
         y = (x / root_squared_mean.unsqueeze(-1)) * self.gamma
 
         return y
+
+
+class SwiGLU(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+    ):
+        super().__init__()
+        self.hidden_dim = int((8 / 3) * dim)
+        self.ff_up = nn.Sequential(
+            nn.Linear(dim, self.hidden_dim, bias=False),
+        )
+        self.ff_gate = nn.Sequential(
+            nn.Linear(dim, self.hidden_dim, bias=False),
+            nn.SiLU(),
+        )
+
+        self.ff_down = nn.Sequential(
+            nn.Linear(self.hidden_dim, dim, bias=False),
+        )
+
+    def forward(
+        self,
+        x,
+    ):
+        x_up = self.ff_up(x)
+        x_gate = self.ff_gate(x)
+
+        x = self.ff_down(x_up * x_gate)
+
+        return x
