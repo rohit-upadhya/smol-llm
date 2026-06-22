@@ -27,7 +27,7 @@ class SmoLLMTokenizer:
     ):
         trainer = BpeTrainer(
             vocab_size=self.vocab_size,
-            special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"],
+            special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[EOS]"],
         )
 
         def batch_iterator(
