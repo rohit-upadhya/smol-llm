@@ -6,14 +6,15 @@ from torch.nn.utils.rnn import pad_sequence
 class SmoLLMDataLoader:
     def __init__(
         self,
-        hf_dataset,
+        dataset,
         tokenizer,
         max_length: int = 512,
+        pad_token_id: str = "[PAD]",
     ):
-        self.dataset = hf_dataset
+        self.dataset = dataset
         self.smollm_tokenizer = tokenizer
         self.max_length = max_length
-        self.pad_token_id = self.smollm_tokenizer.tokenizer.token_to_id("[PAD]")
+        self.pad_token_id = self.smollm_tokenizer.tokenizer.token_to_id(pad_token_id)
 
     def __len__(
         self,
@@ -24,7 +25,7 @@ class SmoLLMDataLoader:
         self,
         idx,
     ):
-        text = self.dataset["train"][idx]["text"]
+        text = self.dataset[idx]["text"]
 
         input_ids = self.smollm_tokenizer.encode(text)
 
@@ -63,19 +64,20 @@ class SmoLLMCollate:
 
 
 def create_dateset(
-    hf_dataset,
+    dataset,
     tokenizer,
     max_length: int = 512,
     batch_size: int = 8,
+    shuffle: bool = True,
 ):
-    dataset = SmoLLMDataLoader(
-        hf_dataset=hf_dataset, tokenizer=tokenizer, max_length=max_length
+    final_dataset = SmoLLMDataLoader(
+        dataset=dataset, tokenizer=tokenizer, max_length=max_length
     )
-    collate_fn = SmoLLMCollate(pad_token_id=dataset.pad_token_id)
+    collate_fn = SmoLLMCollate(pad_token_id=final_dataset.pad_token_id)
     return DataLoader(
-        dataset,
+        final_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=shuffle,
         num_workers=4,
         pin_memory=True,
         collate_fn=collate_fn,

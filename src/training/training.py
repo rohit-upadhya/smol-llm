@@ -1,5 +1,6 @@
 import torch
 import os
+import json
 import torch.nn as nn
 from torch.optim import AdamW
 from tqdm import tqdm
@@ -25,6 +26,8 @@ class SmoLLMTrainer:
         self.loss_criteraion = nn.CrossEntropyLoss(ignore_index=ignore_index)
 
         self.model_save_dir = model_save_dir
+
+        self.history = {"train_loss": [], "eval_loss": []}
 
     def train_epoch(
         self,
@@ -68,7 +71,7 @@ class SmoLLMTrainer:
         self.model.eval()
         total_loss = 0
 
-        loop = tqdm(dataloader, desc=f"Epoch : {epoch_idx}")
+        loop = tqdm(dataloader, desc=f"Val Epoch : {epoch_idx}")
 
         with torch.no_grad():
             for batch in loop:
@@ -94,14 +97,24 @@ class SmoLLMTrainer:
         self,
         epoch_idx,
     ):
-        if not os.path.exists(self.model_save_dir):
-            os.makedirs(self.model_save_dir)
 
-        model_path = os.path.join(self.model_save_dir, f"epoch_{epoch_idx}_weights.pt")
+        model_path = os.path.join(self.model_save_dir, f"epoch_{epoch_idx}")
+        if not os.path.exists(model_path):
+            os.makedirs(model_path)
+
+        final_model_file = os.path.join(model_path, "weights.pt")
 
         model_weights = self.model.state_dict()
 
-        return torch.save(model_weights, model_path), model_path
+        return torch.save(model_weights, final_model_file), final_model_file
+
+    def _save_metrics(
+        self,
+    ):
+        metrics_path = os.path.join(self.model_save_dir, "training_metrics.json")
+        with open(metrics_path, "w") as f:
+            json.dump(self.history, f, indent=4)
+        pass
 
     def fit(
         self,
@@ -113,8 +126,13 @@ class SmoLLMTrainer:
             avg_train_loss = self.train_epoch(
                 dataloader=train_dataloader, epoch_idx=epoch
             )
-            print(f"Average train loss for Epoch : {epoch} = {avg_train_loss}.")
             avg_eval_loss = self.eval_epoch(dataloader=test_dataloader, epoch_idx=epoch)
-            print(f"Average eval loss for Epoch : {epoch} = {avg_eval_loss}.")
 
+            print(f"Average train loss for Epoch : {epoch} = {avg_train_loss}.")
+            print(f"Average eval loss for Epoch : {epoch} = {avg_eval_loss}.")
+            self.history["train_loss"].append(avg_train_loss)
+            self.history["eval_loss"].append(avg_eval_loss)
             _, save_path = self._save_model(epoch_idx=epoch)
+            print(f"Epoch {epoch} saved in {save_path}")
+
+        self._save_metrics()
