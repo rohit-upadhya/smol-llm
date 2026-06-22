@@ -4,6 +4,7 @@ import json
 import torch.nn as nn
 from torch.optim import AdamW
 from tqdm import tqdm
+from datetime import datetime
 
 
 class SmoLLMTrainer:
@@ -28,6 +29,10 @@ class SmoLLMTrainer:
         self.model_save_dir = model_save_dir
 
         self.history = {"train_loss": [], "eval_loss": []}
+
+        now = datetime.now()
+
+        self.formatted_date = now.strftime("%Y_%m_%d__%H_%M")
 
     def train_epoch(
         self,
@@ -98,7 +103,10 @@ class SmoLLMTrainer:
         epoch_idx,
     ):
 
-        model_path = os.path.join(self.model_save_dir, f"epoch_{epoch_idx}")
+        model_path = os.path.join(
+            self.model_save_dir,
+            f"date_of_processing_{self.formatted_date}___epoch_{epoch_idx}",
+        )
         if not os.path.exists(model_path):
             os.makedirs(model_path)
 
