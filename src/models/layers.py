@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class RotatoryPositionalEncoding(nn.Module):
@@ -108,3 +109,54 @@ class SwiGLU(nn.Module):
         x = self.ff_down(x_up * x_gate)
 
         return x
+
+
+class CausalSelfAttention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int = 8,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.n_heads = n_heads
+
+        self.head_dim = dim // n_heads
+
+        self.k_proj = nn.Linear(dim, dim, bias=False)
+
+        self.v_proj = nn.Linear(dim, dim, bias=False)
+
+        self.q_proj = nn.Linear(dim, dim, bias=False)
+
+        self.o_proj = nn.Linear(dim, dim, bias=False)
+
+        self.rotatory_emb = RotatoryPositionalEncoding(head_dim=self.head_dim)
+
+    def forward(
+        self,
+        x,
+    ):
+        B, SEQ, DIM = x.shape
+        k = self.k_proj(x).reshape(B, SEQ, self.n_heads, self.head_dim).transpose(1, 2)
+        q = self.q_proj(x).reshape(B, SEQ, self.n_heads, self.head_dim).transpose(1, 2)
+        v = self.v_proj(x).reshape(B, SEQ, self.n_heads, self.head_dim).transpose(1, 2)
+
+        k = self.rotatory_emb(k)
+        q = self.rotatory_emb(q)
+
+        attention_score = (q @ k.transpose(-2, -1)) / (self.head_dim**0.5)
+
+        mask = torch.triu(torch.ones_like(attention_score), diagonal=1).bool()
+
+        attention_score = attention_score.masked_fill(mask, -float("inf"))
+
+        attention_weights = F.softmax(attention_score, dim=-1)
+
+        v = attention_weights @ v
+
+        attention_output = self.o_proj(
+            v.transpose(1, 2).contiguous().reshape(B, SEQ, DIM)
+        )
+
+        return attention_output
