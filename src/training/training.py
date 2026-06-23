@@ -43,28 +43,35 @@ class SmoLLMTrainer:
         total_loss = 0
 
         loop = tqdm(dataloader, desc=f"Epoch : {epoch_idx}")
+        accumulation_steps = 8
 
-        for batch in loop:
+        self.optimizer.zero_grad()
+
+        for step, batch in enumerate(loop):
             input_ids = batch.get("input_ids").to(self.device)
             labels = batch.get("labels").to(self.device)
-
-            self.optimizer.zero_grad()
 
             logits = self.model(input_ids)
 
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = labels[:, 1:].contiguous()
 
-            epoch_loss = self.loss_criteraion(
+            batch_loss = self.loss_criteraion(
                 shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
             )
+            loss = batch_loss / accumulation_steps
+            loss.backward()
 
-            epoch_loss.backward()
-            self.optimizer.step()
+            if (step + 1) % accumulation_steps == 0:
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                torch.mps.empty_cache()
 
-            total_loss += epoch_loss.item()
+            total_loss += batch_loss.item()
 
-            loop.set_postfix(loss=epoch_loss.item())
+            loop.set_postfix(loss=batch_loss.item())
+
+            del logits, shift_logits, shift_labels, batch_loss, loss
 
         return total_loss / len(dataloader)
 
@@ -79,7 +86,7 @@ class SmoLLMTrainer:
         loop = tqdm(dataloader, desc=f"Val Epoch : {epoch_idx}")
 
         with torch.no_grad():
-            for batch in loop:
+            for step, batch in enumerate(loop):
                 input_ids = batch.get("input_ids").to(self.device)
                 labels = batch.get("labels").to(self.device)
 
@@ -88,13 +95,18 @@ class SmoLLMTrainer:
                 shift_logits = logits[:, :-1, :].contiguous()
                 shift_labels = labels[:, 1:].contiguous()
 
-                epoch_loss = self.loss_criteraion(
+                batch_loss = self.loss_criteraion(
                     shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
                 )
 
-                total_loss += epoch_loss.item()
+                total_loss += batch_loss.item()
 
-                loop.set_postfix(loss=epoch_loss.item())
+                loop.set_postfix(loss=batch_loss.item())
+
+                del logits, shift_logits, shift_labels, batch_loss
+
+                if step % 500 == 0:
+                    torch.mps.empty_cache()
 
         return total_loss / len(dataloader)
 
