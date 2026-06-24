@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.optim import AdamW
 from tqdm import tqdm
 from datetime import datetime
+from typing import Optional
 
 
 class SmoLLMTrainer:
@@ -16,6 +17,7 @@ class SmoLLMTrainer:
         model_save_dir: str = "resources/SmoLLM-100M-Baby-LM-Base",
         save_model: bool = True,
         accumulation_steps: int = 1,
+        save_every_n_steps: int = 250_000_000,
     ):
 
         self.device = torch.device(
@@ -23,7 +25,7 @@ class SmoLLMTrainer:
             if torch.cuda.is_available()
             else "mps" if torch.backends.mps.is_available() else "cpu"
         )
-
+        self.save_every_n_steps = save_every_n_steps
         self.save_model = save_model
         self.model = model.to(self.device)
 
@@ -80,6 +82,10 @@ class SmoLLMTrainer:
                 self.optimizer.zero_grad()
                 torch.mps.empty_cache()
 
+            if self.save_model and (step + 1) % self.save_every_n_steps == 0:
+                _, save_dir = self._save_model(step_idx=step + 1)
+                tqdm.write(f"Checkpoint saved at step {step + 1} -> {save_dir}")
+
             total_loss += batch_loss.item()
             valid_batches += 1
 
@@ -126,13 +132,23 @@ class SmoLLMTrainer:
 
     def _save_model(
         self,
-        epoch_idx,
+        epoch_idx: Optional[int] = None,
+        step_idx: Optional[int] = None,
     ):
 
-        model_path = os.path.join(
-            self.model_save_dir,
-            f"date_of_processing_{self.formatted_date}___epoch_{epoch_idx}",
-        )
+        if epoch_idx:
+            model_path = os.path.join(
+                self.model_save_dir,
+                "epoch",
+                f"date_of_processing_{self.formatted_date}___epoch_{epoch_idx}",
+            )
+        elif step_idx:
+            model_path = os.path.join(
+                self.model_save_dir,
+                "steps",
+                f"date_of_processing_{self.formatted_date}___step_{step_idx}",
+            )
+
         if not os.path.exists(model_path):
             os.makedirs(model_path)
 
