@@ -55,6 +55,7 @@ class SmoLLMRunner:
             save_model=save_model,
             accumulation_steps=accumulation_steps,
             save_every_n_steps=save_every_n_steps,
+            tokenizer=tokenizer,
         )
 
         trainer.fit(
@@ -99,7 +100,7 @@ class SmoLLMRunner:
             batch_size=4,
             save_model=True,
             accumulation_steps=4,
-            save_every_n_steps=250_000_000,
+            save_every_n_steps=250_000,
         )
 
     def micro_train_loop(

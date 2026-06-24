@@ -11,6 +11,7 @@ from typing import Optional
 class SmoLLMTrainer:
     def __init__(
         self,
+        tokenizer: object,
         model: nn.Module,
         lr: float = 1e-4,
         ignore_index: int = -100,
@@ -19,7 +20,7 @@ class SmoLLMTrainer:
         accumulation_steps: int = 1,
         save_every_n_steps: int = 250_000_000,
     ):
-
+        self.tokenizer = tokenizer
         self.device = torch.device(
             "cuda"
             if torch.cuda.is_available()
@@ -80,10 +81,10 @@ class SmoLLMTrainer:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-                torch.mps.empty_cache()
+                self._empty_cache()
 
             if self.save_model and (step + 1) % self.save_every_n_steps == 0:
-                _, save_dir = self._save_model(step_idx=step + 1)
+                save_dir = self._save_model(step_idx=step + 1)
                 tqdm.write(f"Checkpoint saved at step {step + 1} -> {save_dir}")
 
             total_loss += batch_loss.item()
@@ -92,6 +93,12 @@ class SmoLLMTrainer:
             loop.set_postfix(loss=batch_loss.item())
 
             del logits, shift_logits, shift_labels, batch_loss, loss
+
+        if valid_batches % self.accumulation_steps != 0:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+            self._empty_cache()
 
         return total_loss / valid_batches if valid_batches > 0 else float("inf")
 
@@ -126,7 +133,7 @@ class SmoLLMTrainer:
                 del logits, shift_logits, shift_labels, batch_loss
 
                 if step % 500 == 0:
-                    torch.mps.empty_cache()
+                    self._empty_cache()
 
         return total_loss / len(dataloader)
 
@@ -156,7 +163,12 @@ class SmoLLMTrainer:
 
         model_weights = self.model.state_dict()
 
-        return torch.save(model_weights, final_model_file), final_model_file
+        torch.save(model_weights, final_model_file)
+
+        tokenizer_save_path = os.path.join(model_path, "tokenizer.json")
+        self.tokenizer.tokenizer.save(tokenizer_save_path)
+
+        return final_model_file
 
     def _save_metrics(
         self,
@@ -165,6 +177,12 @@ class SmoLLMTrainer:
         with open(metrics_path, "w") as f:
             json.dump(self.history, f, indent=4)
         pass
+
+    def _empty_cache(self):
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        elif self.device.type == "mps":
+            torch.mps.empty_cache()
 
     def fit(
         self,
@@ -183,7 +201,7 @@ class SmoLLMTrainer:
             self.history["train_loss"].append(avg_train_loss)
             self.history["eval_loss"].append(avg_eval_loss)
             if self.save_model:
-                _, save_path = self._save_model(epoch_idx=epoch)
+                save_path = self._save_model(epoch_idx=epoch)
                 print(f"Epoch {epoch} saved in {save_path}")
         if self.save_model:
             self._save_metrics()
