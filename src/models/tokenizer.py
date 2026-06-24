@@ -24,18 +24,18 @@ class SmoLLMTokenizer:
     def train(
         self,
         hf_dataset,
+        num_docs_for_training: int = 100000,
     ):
         trainer = BpeTrainer(
             vocab_size=self.vocab_size,
             special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[EOS]"],
         )
 
-        def batch_iterator(
-            batch_size=10000,
-        ):
-            for i in range(0, len(hf_dataset), batch_size):
-                yield hf_dataset[i : i + batch_size]["text"]
-            pass
+        def batch_iterator():
+            for i, item in enumerate(hf_dataset):
+                if i >= num_docs_for_training:
+                    break
+                yield item["text"]
 
         self.tokenizer.train_from_iterator(batch_iterator(), trainer=trainer)
         self.tokenizer.save(self.model_path)

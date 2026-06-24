@@ -7,16 +7,33 @@ load_dotenv()
 class DataDownload:
     def __init__(
         self,
-        dataset_name: str = "BabyLM-community/BabyLM-2026-Strict-Small",
+        dataset_name: str = "HuggingFaceFW/fineweb-edu",
+        config_name: str = "sample-10BT",
+        docs_to_take: int = 2_500_000,
+        streaming: bool = True,
+        split: str = "train",
     ):
-        self.dataset = self._load_dataset(dataset_name=dataset_name)
-        pass
+        self.config_name = config_name
+        self.docs_to_take = docs_to_take
+        self.dataset_name = dataset_name
+        self._load_dataset(streaming=streaming, split=split)
 
     def _load_dataset(
         self,
-        dataset_name: str,
+        streaming: bool = True,
+        split: str = "train",
     ):
-        return load_dataset(dataset_name, cache_dir="resources/")
+        dataset = load_dataset(
+            self.dataset_name,
+            name=self.config_name,
+            split=split,
+            streaming=streaming,
+        )
+        print(f"Number of documents loaded : {self.docs_to_take}.")
+        if streaming and self.docs_to_take is not None:
+            self.dataset = dataset.take(self.docs_to_take)
+        else:
+            self.dataset = dataset
 
     def __call__(
         self,
@@ -25,7 +42,9 @@ class DataDownload:
 
 
 if __name__ == "__main__":
-    dd = DataDownload()
+    dd = DataDownload(docs_to_take=10)
     my_dataset = dd()
-    print("Dataset Structure:\n", my_dataset)
-    print(my_dataset["train"][0])
+
+    for i, doc in enumerate(my_dataset):
+        print(f"\n--- Document {i+1} ---")
+        print(doc.get("text", "") + "\n")

@@ -14,12 +14,17 @@ class SmoLLMTrainer:
         lr: float = 1e-4,
         ignore_index: int = -100,
         model_save_dir: str = "resources/SmoLLM-100M-Baby-LM-Base",
+        save_model: bool = True,
+        accumulation_steps: int = 1,
     ):
 
         self.device = torch.device(
-            "mps" if torch.backends.mps.is_available() else "cpu"
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps" if torch.backends.mps.is_available() else "cpu"
         )
 
+        self.save_model = save_model
         self.model = model.to(self.device)
 
         self.optimizer = AdamW(self.model.parameters(), lr=lr)
@@ -34,6 +39,8 @@ class SmoLLMTrainer:
 
         self.formatted_date = now.strftime("%Y_%m_%d__%H_%M")
 
+        self.accumulation_steps = accumulation_steps
+
     def train_epoch(
         self,
         dataloader,
@@ -44,7 +51,6 @@ class SmoLLMTrainer:
         valid_batches = 0
 
         loop = tqdm(dataloader, desc=f"Epoch : {epoch_idx}")
-        accumulation_steps = 8
 
         self.optimizer.zero_grad()
 
@@ -65,10 +71,10 @@ class SmoLLMTrainer:
                 del logits, shift_logits, shift_labels, batch_loss
                 continue
 
-            loss = batch_loss / accumulation_steps
+            loss = batch_loss / self.accumulation_steps
             loss.backward()
 
-            if (step + 1) % accumulation_steps == 0:
+            if (step + 1) % self.accumulation_steps == 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -160,7 +166,8 @@ class SmoLLMTrainer:
             print(f"Average eval loss for Epoch : {epoch} = {avg_eval_loss}.")
             self.history["train_loss"].append(avg_train_loss)
             self.history["eval_loss"].append(avg_eval_loss)
-            _, save_path = self._save_model(epoch_idx=epoch)
-            print(f"Epoch {epoch} saved in {save_path}")
-
-        self._save_metrics()
+            if self.save_model:
+                _, save_path = self._save_model(epoch_idx=epoch)
+                print(f"Epoch {epoch} saved in {save_path}")
+        if self.save_model:
+            self._save_metrics()

@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, IterableDataset
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -32,9 +32,34 @@ class SmoLLMDataLoader:
         if len(input_ids) > self.max_length:
             input_ids = input_ids[: self.max_length]
 
-        tensor_ids = torch.tensor(input_ids)
+        tensor_ids = torch.tensor(input_ids, dtype=torch.long)
 
         return {"input_ids": tensor_ids, "labels": tensor_ids.clone()}
+
+
+class SmoLLMIterableDataset(IterableDataset):
+    def __init__(
+        self,
+        dataset,
+        tokenizer,
+        max_length: int = 512,
+    ):
+        self.dataset = dataset
+        self.smollm_tokenizer = tokenizer
+        self.max_length = max_length
+
+    def __iter__(self):
+        for item in self.dataset:
+            text = item.get("text", "")
+
+            input_ids = self.smollm_tokenizer.encode(text)
+
+            if len(input_ids) > self.max_length:
+                input_ids = input_ids[: self.max_length]
+
+            tensor_ids = torch.tensor(input_ids, dtype=torch.long)
+
+            yield {"input_ids": tensor_ids, "labels": tensor_ids.clone()}
 
 
 class SmoLLMCollate:
@@ -70,15 +95,39 @@ def create_dateset(
     batch_size: int = 8,
     shuffle: bool = True,
 ):
-    final_dataset = SmoLLMDataLoader(
-        dataset=dataset, tokenizer=tokenizer, max_length=max_length
-    )
-    collate_fn = SmoLLMCollate(pad_token_id=final_dataset.pad_token_id)
-    return DataLoader(
-        final_dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=4,
-        pin_memory=True,
-        collate_fn=collate_fn,
-    )
+    pad_id = tokenizer.tokenizer.token_to_id("[PAD]")
+    collate_fn = SmoLLMCollate(pad_token_id=pad_id)
+
+    try:
+        _ = len(dataset)
+        is_stream = False
+    except TypeError:
+        is_stream = True
+
+    if is_stream:
+        final_dataset = SmoLLMIterableDataset(
+            dataset=dataset, tokenizer=tokenizer, max_length=max_length
+        )
+        return DataLoader(
+            final_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=True,
+            collate_fn=collate_fn,
+        )
+    else:
+        final_dataset = SmoLLMDataLoader(
+            dataset=dataset,
+            tokenizer=tokenizer,
+            max_length=max_length,
+            pad_token_id="[PAD]",
+        )
+        return DataLoader(
+            final_dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=4,
+            pin_memory=True,
+            collate_fn=collate_fn,
+        )

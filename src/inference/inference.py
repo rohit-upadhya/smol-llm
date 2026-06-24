@@ -19,7 +19,9 @@ class Inference:
         self.n_layers = n_layers
 
         self.device = torch.device(
-            "mps" if torch.backends.mps.is_available() else "cpu"
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps" if torch.backends.mps.is_available() else "cpu"
         )
         self._init_model_tokenizer()
 
@@ -31,6 +33,7 @@ class Inference:
             vocab_size=self.tokenizer.vocab_size,
             n_heads=self.n_heads,
             n_layers=self.n_layers,
+            dim=self.dim,
         ).to(self.device)
 
         print("Loading weights.")
@@ -90,13 +93,13 @@ class Inference:
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = "resources/SmoLLM-100M-Baby-LM-Base/date_of_processing_YOUR_DATE___epoch_3/weights.pt"
+    WEIGHTS_PATH = "resources/SmoLLM-100M-Baby-LM-Base/date_of_processing_2026_06_23__22_28___epoch_2/weights.pt"
 
     if os.path.exists(WEIGHTS_PATH):
-        inferencer = Inference(model_weights_path=WEIGHTS_PATH)
+        inferencer = Inference(model_name_or_path=WEIGHTS_PATH)
 
-        prompt = "Machine learning is"
-        output = inferencer.generate(prompt=prompt, max_new_tokens=50, temperature=0.8)
+        prompt = "Machine Learning is"
+        output = inferencer.generate(prompt=prompt, max_tokens=50, temperature=0.8)
 
         print("\n" + output)
     else:
