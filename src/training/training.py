@@ -41,6 +41,7 @@ class SmoLLMTrainer:
     ):
         self.model.train()
         total_loss = 0
+        valid_batches = 0
 
         loop = tqdm(dataloader, desc=f"Epoch : {epoch_idx}")
         accumulation_steps = 8
@@ -59,21 +60,28 @@ class SmoLLMTrainer:
             batch_loss = self.loss_criteraion(
                 shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
             )
+
+            if torch.isnan(batch_loss) or torch.isinf(batch_loss):
+                del logits, shift_logits, shift_labels, batch_loss
+                continue
+
             loss = batch_loss / accumulation_steps
             loss.backward()
 
             if (step + 1) % accumulation_steps == 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 torch.mps.empty_cache()
 
             total_loss += batch_loss.item()
+            valid_batches += 1
 
             loop.set_postfix(loss=batch_loss.item())
 
             del logits, shift_logits, shift_labels, batch_loss, loss
 
-        return total_loss / len(dataloader)
+        return total_loss / valid_batches if valid_batches > 0 else float("inf")
 
     def eval_epoch(
         self,
