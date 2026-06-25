@@ -38,8 +38,8 @@ class SmoLLMTrainer:
 
         self.loss_criteraion = nn.CrossEntropyLoss(ignore_index=ignore_index)
 
-        self.warmup_steps = 2000
-        self.max_steps = 750_000
+        self.warmup_steps = warmup_steps
+        self.max_steps = max_steps
 
         def lr_lambda(current_step):
             if current_step < self.warmup_steps:
@@ -97,6 +97,7 @@ class SmoLLMTrainer:
             if (step + 1) % self.accumulation_steps == 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optimizer.step()
+                self.scheduler.step()
                 self.optimizer.zero_grad()
                 self._empty_cache()
 
@@ -110,7 +111,7 @@ class SmoLLMTrainer:
             current_lr = self.optimizer.param_groups[0]["lr"]
             loop.set_postfix(
                 loss=batch_loss.item(),
-                lr=f"{current_lr:.2e}",
+                lr=f"{current_lr:.6f}",
             )
             del logits, shift_logits, shift_labels, batch_loss, loss
 
@@ -167,14 +168,18 @@ class SmoLLMTrainer:
         if epoch_idx:
             model_path = os.path.join(
                 self.model_save_dir,
-                "epoch",
-                f"date_of_processing_{self.formatted_date}___epoch_{epoch_idx}",
+                f"epoch_{epoch_idx}",
+                f"date_of_processing_{self.formatted_date}",
+                "epochs",
+                f"epoch_{epoch_idx}",
             )
         elif step_idx:
             model_path = os.path.join(
                 self.model_save_dir,
+                f"epoch_{epoch_idx}",
+                f"date_of_processing_{self.formatted_date}",
                 "steps",
-                f"date_of_processing_{self.formatted_date}___step_{step_idx}",
+                f"step_{step_idx}",
             )
 
         if not os.path.exists(model_path):

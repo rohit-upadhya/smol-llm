@@ -19,12 +19,11 @@ class SmoLLMRunner:
         save_model: bool = True,
         accumulation_steps: int = 1,
         save_every_n_steps: int = 250_000,
-        epoch: int = 1,
         docs_to_take: int = 3_000_000,
     ):
         self.batch_size = batch_size
         self.docs_to_take = docs_to_take
-        self.epoch = epoch
+        self.epochs = epochs
         self.accumulation_steps = accumulation_steps
         tokenizer = SmoLLMTokenizer()
         tokenizer.load_or_train(hf_dataset=train_data)
@@ -110,9 +109,9 @@ class SmoLLMRunner:
             n_layers=8,
             lr=5e-4,
             epochs=1,
-            batch_size=4,
+            batch_size=8,
             save_model=True,
-            accumulation_steps=4,
+            accumulation_steps=16,
             save_every_n_steps=250_000,
             docs_to_take=3_000_000,
         )
@@ -151,10 +150,9 @@ class SmoLLMRunner:
             dim=768,
             n_layers=8,
             lr=5e-4,
-            epochs=500,
+            epochs=50,
             batch_size=4,
             accumulation_steps=4,
-            save_every_n_steps=100,
             save_model=True,
             docs_to_take=docs_to_take,
         )
