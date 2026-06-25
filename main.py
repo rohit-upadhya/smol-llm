@@ -18,24 +18,33 @@ class SmoLLMRunner:
         batch_size: int = 4,
         save_model: bool = True,
         accumulation_steps: int = 1,
-        save_every_n_steps: int = 250_000_000,
+        save_every_n_steps: int = 250_000,
+        epoch: int = 1,
+        docs_to_take: int = 3_000_000,
     ):
-
+        self.batch_size = batch_size
+        self.docs_to_take = docs_to_take
+        self.epoch = epoch
+        self.accumulation_steps = accumulation_steps
         tokenizer = SmoLLMTokenizer()
         tokenizer.load_or_train(hf_dataset=train_data)
         pad_token_id = tokenizer.tokenizer.token_to_id("[PAD]")
 
+        total_batches = self.docs_to_take // self.batch_size
+        max_steps = (total_batches // self.accumulation_steps) * self.epochs
+        warmup_steps = int(max_steps * 0.05)
+
         train_loader = create_dateset(
             dataset=train_data,
             tokenizer=tokenizer,
-            shuffle=True,
+            shuffle=False,
             batch_size=batch_size,
         )
 
         test_loader = create_dateset(
             dataset=test_data,
             tokenizer=tokenizer,
-            shuffle=False,
+            shuffle=True,
             batch_size=batch_size,
         )
 
@@ -56,6 +65,8 @@ class SmoLLMRunner:
             accumulation_steps=accumulation_steps,
             save_every_n_steps=save_every_n_steps,
             tokenizer=tokenizer,
+            warmup_steps=warmup_steps,
+            max_steps=max_steps,
         )
 
         trainer.fit(
@@ -67,13 +78,15 @@ class SmoLLMRunner:
     def main(
         self,
     ):
+        docs_to_take = 3_000_000
+
         print("Loading Training Data")
         train_downloader = DataDownload(
             dataset_name="HuggingFaceFW/fineweb-edu",
             config_name="sample-10BT",
             split="train",
             streaming=True,
-            docs_to_take=3_000_000,
+            docs_to_take=docs_to_take,
         )
         train_stream = train_downloader()
         print("Loaded Training Data")
@@ -101,18 +114,21 @@ class SmoLLMRunner:
             save_model=True,
             accumulation_steps=4,
             save_every_n_steps=250_000,
+            docs_to_take=3_000_000,
         )
 
     def micro_train_loop(
         self,
     ):
+        docs_to_take = 500
+
         print("Loading Training Data")
         train_downloader = DataDownload(
             dataset_name="HuggingFaceFW/fineweb-edu",
             config_name="sample-10BT",
             split="train",
             streaming=True,
-            docs_to_take=500,  # The micro-batch cap for local testing
+            docs_to_take=docs_to_take,
         )
         train_stream = train_downloader()
         print("Loaded Training Data")
@@ -131,15 +147,16 @@ class SmoLLMRunner:
         self._execute_pipeline(
             train_data=train_stream,
             test_data=val_data,
-            n_heads=1,
-            dim=8,
-            n_layers=1,
-            lr=1e-3,
-            epochs=2,
+            n_heads=12,
+            dim=768,
+            n_layers=8,
+            lr=5e-4,
+            epochs=500,
             batch_size=4,
+            accumulation_steps=4,
+            save_every_n_steps=100,
             save_model=True,
-            accumulation_steps=1,
-            save_every_n_steps=50,
+            docs_to_take=docs_to_take,
         )
 
     def train_tokenizer(

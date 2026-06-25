@@ -1,6 +1,8 @@
 import torch
 import os
 import json
+import math
+from torch.optim.lr_scheduler import LambdaLR
 import torch.nn as nn
 from torch.optim import AdamW
 from tqdm import tqdm
@@ -19,6 +21,8 @@ class SmoLLMTrainer:
         save_model: bool = True,
         accumulation_steps: int = 1,
         save_every_n_steps: int = 250_000_000,
+        warmup_steps: int = 2000,
+        max_steps: int = 750_000,
     ):
         self.tokenizer = tokenizer
         self.device = torch.device(
@@ -33,6 +37,19 @@ class SmoLLMTrainer:
         self.optimizer = AdamW(self.model.parameters(), lr=lr)
 
         self.loss_criteraion = nn.CrossEntropyLoss(ignore_index=ignore_index)
+
+        self.warmup_steps = 2000
+        self.max_steps = 750_000
+
+        def lr_lambda(current_step):
+            if current_step < self.warmup_steps:
+                return float(current_step) / float(max(1, self.warmup_steps))
+            progress = float(current_step - self.warmup_steps) / float(
+                max(1, self.max_steps - self.warmup_steps)
+            )
+            return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+        self.scheduler = LambdaLR(self.optimizer, lr_lambda)
 
         self.model_save_dir = model_save_dir
 
@@ -90,13 +107,17 @@ class SmoLLMTrainer:
             total_loss += batch_loss.item()
             valid_batches += 1
 
-            loop.set_postfix(loss=batch_loss.item())
-
+            current_lr = self.optimizer.param_groups[0]["lr"]
+            loop.set_postfix(
+                loss=batch_loss.item(),
+                lr=f"{current_lr:.2e}",
+            )
             del logits, shift_logits, shift_labels, batch_loss, loss
 
         if valid_batches % self.accumulation_steps != 0:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
+            self.scheduler.step()
             self.optimizer.zero_grad()
             self._empty_cache()
 
