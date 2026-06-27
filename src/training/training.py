@@ -57,7 +57,7 @@ class SmoLLMTrainer:
 
         self.model_save_dir = model_save_dir
 
-        self.history = {"train_loss": [], "eval_loss": []}
+        self.history = {"train_loss": [], "eval_loss": [], "step_eval_loss": []}
 
         now = datetime.now()
 
@@ -69,11 +69,15 @@ class SmoLLMTrainer:
             S3Uploader(bucket_name="smol-lm-bucket") if self.upload_models else None
         )
 
+        self.global_steps = 0
+
     def train_epoch(
         self,
         dataloader,
+        test_dataloader,
         epoch_idx: int,
     ):
+
         self.model.train()
         total_loss = 0
         valid_batches = 0
@@ -83,6 +87,7 @@ class SmoLLMTrainer:
         self.optimizer.zero_grad()
 
         for step, batch in enumerate(loop):
+            self.global_steps += 1
             input_ids = batch.get("input_ids").to(self.device)
             labels = batch.get("labels").to(self.device)
 
@@ -109,22 +114,36 @@ class SmoLLMTrainer:
                 self.optimizer.zero_grad()
                 self._empty_cache()
 
-            if self.save_model and (step + 1) % self.save_every_n_steps == 0:
-                save_dir = self._save_model(step_idx=step + 1)
-                tqdm.write(f"Checkpoint saved at step {step + 1} -> {save_dir}")
-
-                if self.upload_models:
-                    tqdm.write(f"Streaming step {step + 1} checkpoint to S3.")
-                    self._upload_model(local_folder=save_dir)
-
             total_loss += batch_loss.item()
             valid_batches += 1
 
             current_lr = self.optimizer.param_groups[0]["lr"]
             loop.set_postfix(
                 loss=batch_loss.item(),
-                lr=f"{current_lr:.15f}",
+                lr=f"{current_lr:.5f}",
             )
+
+            if self.save_model and self.global_steps % self.save_every_n_steps == 0:
+                save_dir = self._save_model(step_idx=self.global_steps)
+                tqdm.write(f"Checkpoint saved at step {step + 1} -> {save_dir}")
+
+                del logits, shift_logits, shift_labels, batch_loss, loss
+                self._empty_cache()
+
+                avg_eval_loss = self.eval_epoch(
+                    dataloader=test_dataloader, epoch_idx=epoch_idx
+                )
+                self.history["step_eval_loss"].append(
+                    {"epoch": epoch_idx, "step": step + 1, "eval_loss": avg_eval_loss}
+                )
+                tqdm.write(f"Step {step + 1} Mid-Epoch Eval Loss: {avg_eval_loss:.4f}")
+                self.model.train()
+
+                if self.upload_models:
+                    tqdm.write(f"Streaming step {step + 1} checkpoint to S3.")
+                    self._upload_model(local_folder=save_dir)
+                continue
+
             del logits, shift_logits, shift_labels, batch_loss, loss
 
         if valid_batches % self.accumulation_steps != 0:
@@ -238,7 +257,9 @@ class SmoLLMTrainer:
     ):
         for epoch in range(1, epochs + 1):
             avg_train_loss = self.train_epoch(
-                dataloader=train_dataloader, epoch_idx=epoch
+                dataloader=train_dataloader,
+                test_dataloader=test_dataloader,
+                epoch_idx=epoch,
             )
             avg_eval_loss = self.eval_epoch(dataloader=test_dataloader, epoch_idx=epoch)
 

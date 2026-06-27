@@ -109,7 +109,7 @@ class SmoLLMRunner:
             dim=768,
             n_layers=8,
             lr=5e-4,
-            epochs=2,
+            epochs=1,
             batch_size=8,
             save_model=True,
             accumulation_steps=8,
