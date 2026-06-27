@@ -93,7 +93,7 @@ class Inference:
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = "resources/SmoLLM-100M-Baby-LM-Base/date_of_processing_2026_06_23__22_28___epoch_2/weights.pt"
+    WEIGHTS_PATH = "resources/SmoLLM-100M-Baby-LM-Base/epoch_7/date_of_processing_2026_06_26__00_40/epochs/epoch_7/weights.pt"
 
     if os.path.exists(WEIGHTS_PATH):
         inferencer = Inference(model_name_or_path=WEIGHTS_PATH)

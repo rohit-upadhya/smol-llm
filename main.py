@@ -77,8 +77,9 @@ class SmoLLMRunner:
     def main(
         self,
     ):
-        docs_to_take = 3_000_000
-
+        docs_to_take = 3_000_000  # 3_000_000
+        save_every_n_steps = 93_750  # 93_750
+        test_docs_to_take = 5000
         print("Loading Training Data")
         train_downloader = DataDownload(
             dataset_name="HuggingFaceFW/fineweb-edu",
@@ -97,7 +98,7 @@ class SmoLLMRunner:
             streaming=False,
         )
         val_data = val_downloader()
-        val_data = val_data.select(range(min(5000, len(val_data))))
+        val_data = val_data.select(range(min(test_docs_to_take, len(val_data))))
         print("Loaded val Data")
 
         print("Starting Training Pipeline...")
@@ -108,12 +109,12 @@ class SmoLLMRunner:
             dim=768,
             n_layers=8,
             lr=5e-4,
-            epochs=1,
+            epochs=2,
             batch_size=8,
             save_model=True,
-            accumulation_steps=16,
-            save_every_n_steps=250_000,
-            docs_to_take=3_000_000,
+            accumulation_steps=8,
+            save_every_n_steps=save_every_n_steps,
+            docs_to_take=docs_to_take,
         )
 
     def micro_train_loop(
@@ -150,10 +151,11 @@ class SmoLLMRunner:
             dim=768,
             n_layers=8,
             lr=5e-4,
-            epochs=50,
-            batch_size=4,
-            accumulation_steps=4,
+            epochs=10,
+            batch_size=8,
+            accumulation_steps=8,
             save_model=True,
+            save_every_n_steps=100,
             docs_to_take=docs_to_take,
         )
 
@@ -169,4 +171,4 @@ class SmoLLMRunner:
 
 if __name__ == "__main__":
     runner = SmoLLMRunner()
-    runner.micro_train_loop()
+    runner.main()
