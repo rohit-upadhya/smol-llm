@@ -18,7 +18,7 @@ class SmoLLMRunner:
         batch_size: int = 4,
         save_model: bool = True,
         accumulation_steps: int = 1,
-        save_every_n_steps: int = 250_000,
+        save_every_n_steps: int = 100_000,
         docs_to_take: int = 3_000_000,
     ):
         self.batch_size = batch_size
@@ -77,9 +77,53 @@ class SmoLLMRunner:
     def main(
         self,
     ):
-        docs_to_take = 3_000_000  # 3_000_000
-        save_every_n_steps = 93_750  # 93_750
+        docs_to_take = 3_500_000  # 3_500_000
+        save_every_n_steps = 109_375  # 109_375
         test_docs_to_take = 5000
+        print("Loading Training Data")
+        train_downloader = DataDownload(
+            dataset_name="HuggingFaceFW/fineweb-edu",
+            config_name="sample-10BT",
+            split="train",
+            streaming=True,
+            docs_to_take=docs_to_take,
+        )
+        train_stream = train_downloader()
+        print("Loaded Training Data")
+        print("Loading Val Data")
+        val_downloader = DataDownload(
+            dataset_name="Salesforce/wikitext",
+            config_name="wikitext-2-raw-v1",
+            split="validation",
+            streaming=False,
+        )
+        val_data = val_downloader()
+        val_data = val_data.select(range(min(test_docs_to_take, len(val_data))))
+        print("Loaded val Data")
+
+        print("Starting Training Pipeline...")
+        self._execute_pipeline(
+            train_data=train_stream,
+            test_data=val_data,
+            n_heads=12,
+            dim=768,
+            n_layers=12,
+            lr=5e-4,
+            epochs=1,
+            batch_size=8,
+            save_model=True,
+            accumulation_steps=8,
+            save_every_n_steps=save_every_n_steps,
+            docs_to_take=docs_to_take,
+        )
+
+    def micro_train_loop(
+        self,
+    ):
+        docs_to_take = 128
+        save_every_n_steps = 8
+        test_docs_to_take = 10
+
         print("Loading Training Data")
         train_downloader = DataDownload(
             dataset_name="HuggingFaceFW/fineweb-edu",
@@ -109,53 +153,11 @@ class SmoLLMRunner:
             dim=768,
             n_layers=8,
             lr=5e-4,
-            epochs=1,
+            epochs=5,
             batch_size=8,
-            save_model=True,
             accumulation_steps=8,
+            save_model=True,
             save_every_n_steps=save_every_n_steps,
-            docs_to_take=docs_to_take,
-        )
-
-    def micro_train_loop(
-        self,
-    ):
-        docs_to_take = 500
-
-        print("Loading Training Data")
-        train_downloader = DataDownload(
-            dataset_name="HuggingFaceFW/fineweb-edu",
-            config_name="sample-10BT",
-            split="train",
-            streaming=True,
-            docs_to_take=docs_to_take,
-        )
-        train_stream = train_downloader()
-        print("Loaded Training Data")
-        print("Loading Val Data")
-        val_downloader = DataDownload(
-            dataset_name="Salesforce/wikitext",
-            config_name="wikitext-2-raw-v1",
-            split="validation",
-            streaming=False,
-        )
-        val_data = val_downloader()
-        val_data = val_data.select(range(min(100, len(val_data))))
-        print("Loaded val Data")
-
-        print("Starting Training Pipeline...")
-        self._execute_pipeline(
-            train_data=train_stream,
-            test_data=val_data,
-            n_heads=12,
-            dim=768,
-            n_layers=8,
-            lr=5e-4,
-            epochs=10,
-            batch_size=8,
-            accumulation_steps=8,
-            save_model=True,
-            save_every_n_steps=100,
             docs_to_take=docs_to_take,
         )
 
