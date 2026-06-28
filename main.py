@@ -55,7 +55,7 @@ class SmoLLMRunner:
             dim=dim,
             n_layers=n_layers,
         )
-
+        self._print_model_size(model=model)
         trainer = SmoLLMTrainer(
             model=model,
             lr=lr,
@@ -78,7 +78,7 @@ class SmoLLMRunner:
         self,
     ):
         docs_to_take = 3_500_000  # 3_500_000
-        save_every_n_steps = 109_375  # 109_375
+        save_every_n_steps = 72_917  # 109_375
         test_docs_to_take = 5000
         print("Loading Training Data")
         train_downloader = DataDownload(
@@ -110,9 +110,9 @@ class SmoLLMRunner:
             n_layers=12,
             lr=5e-4,
             epochs=1,
-            batch_size=8,
+            batch_size=12,
             save_model=True,
-            accumulation_steps=8,
+            accumulation_steps=16,
             save_every_n_steps=save_every_n_steps,
             docs_to_take=docs_to_take,
         )
@@ -121,7 +121,7 @@ class SmoLLMRunner:
         self,
     ):
         docs_to_take = 128
-        save_every_n_steps = 8
+        save_every_n_steps = 16
         test_docs_to_take = 10
 
         print("Loading Training Data")
@@ -151,19 +151,29 @@ class SmoLLMRunner:
             test_data=val_data,
             n_heads=12,
             dim=768,
-            n_layers=8,
+            n_layers=12,
             lr=5e-4,
-            epochs=5,
-            batch_size=8,
-            accumulation_steps=8,
+            epochs=2,
+            batch_size=12,
             save_model=True,
+            accumulation_steps=16,
             save_every_n_steps=save_every_n_steps,
             docs_to_take=docs_to_take,
         )
 
+    def _print_model_size(
+        self,
+        model,
+    ):
+        total_params = sum(p.numel() for p in model.parameters())
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+        print(f"Total Parameters: {total_params:,}")
+        print(f"Trainable Parameters: {trainable_params:,}")
+
     def train_tokenizer(
         self,
-        sample_size: int = 100000,
+        sample_size: int = 200_000,
     ):
         downloader = DataDownload()
         hf_data = downloader()
@@ -173,4 +183,4 @@ class SmoLLMRunner:
 
 if __name__ == "__main__":
     runner = SmoLLMRunner()
-    runner.main()
+    runner.train_tokenizer()

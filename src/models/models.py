@@ -32,6 +32,8 @@ class SmoLLM(nn.Module):
 
         self.lm_head = nn.Linear(dim, vocab_size, bias=False)
 
+        self.lm_head.weight = self.tok_embeddings.weight
+
     def forward(
         self,
         input_ids,

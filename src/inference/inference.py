@@ -11,7 +11,7 @@ class Inference:
         model_name_or_path: str,
         n_heads: int = 12,
         dim: int = 768,
-        n_layers: int = 8,
+        n_layers: int = 12,
     ):
         self.model_name_or_path = model_name_or_path
         self.n_heads = n_heads
@@ -93,13 +93,13 @@ class Inference:
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = "resources/SmoLLM-100M-Baby-LM-Base/epoch_7/date_of_processing_2026_06_26__00_40/epochs/epoch_7/weights.pt"
+    WEIGHTS_PATH = "resources/SmoLLM-100M-Baby-LM-Base/run_2026_06_27__16_32/checkpoint-step-109375/pytorch_model.bin"
 
     if os.path.exists(WEIGHTS_PATH):
         inferencer = Inference(model_name_or_path=WEIGHTS_PATH)
 
-        prompt = "Machine Learning is"
-        output = inferencer.generate(prompt=prompt, max_tokens=50, temperature=0.8)
+        prompt = "Shillong is "
+        output = inferencer.generate(prompt=prompt, max_tokens=64, temperature=0.8)
 
         print("\n" + output)
     else:

@@ -9,7 +9,7 @@ from tqdm import tqdm
 from datetime import datetime
 from typing import Optional
 
-from src.commons.aws_uploader import S3Uploader
+from src.commons.aws_uploader import S3Manager
 
 
 class SmoLLMTrainer:
@@ -66,7 +66,7 @@ class SmoLLMTrainer:
         self.accumulation_steps = accumulation_steps
 
         self.s3_upload_obj = (
-            S3Uploader(bucket_name="smol-lm-bucket") if self.upload_models else None
+            S3Manager(bucket_name="smol-lm-bucket") if self.upload_models else None
         )
 
         self.global_steps = 0

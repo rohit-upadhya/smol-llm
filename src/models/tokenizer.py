@@ -1,7 +1,8 @@
 from tokenizers import Tokenizer as HFTokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import Whitespace
+from tokenizers.pre_tokenizers import ByteLevel as ByteLevelPre, ByteLevel, Whitespace
+from tokenizers.decoders import ByteLevel as ByteLevelDec
 import os
 
 
@@ -19,16 +20,18 @@ class SmoLLMTokenizer:
             print("Loaded Tokenizer")
         else:
             self.tokenizer = HFTokenizer(BPE(unk_token="[UNK]"))
-            self.tokenizer.pre_tokenizer = Whitespace()
+            self.tokenizer.pre_tokenizer = ByteLevelPre(add_prefix_space=False)
+            self.tokenizer.decoder = ByteLevelDec()
 
     def train(
         self,
         hf_dataset,
-        num_docs_for_training: int = 100000,
+        num_docs_for_training: int = 3_500_000,
     ):
         trainer = BpeTrainer(
             vocab_size=self.vocab_size,
             special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[EOS]"],
+            initial_alphabet=ByteLevel.alphabet(),
         )
 
         def batch_iterator():
