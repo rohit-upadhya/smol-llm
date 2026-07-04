@@ -33,13 +33,13 @@ class RotatoryPositionalEncoding(nn.Module):
         q,
         k,
     ):
-        seq_length = q.shape[1]
+        seq_length = q.shape[2]
 
         cos = self.cos_cached[:seq_length]
         sin = self.sin_cached[:seq_length]
 
-        cos = cos.unsqueeze(0).unsqueeze(2)
-        sin = sin.unsqueeze(0).unsqueeze(2)
+        cos = cos.unsqueeze(0).unsqueeze(1)
+        sin = sin.unsqueeze(0).unsqueeze(1)
 
         q_rotated = (q * cos) + (self._rotate_half(q) * sin)
         k_rotated = (k * cos) + (self._rotate_half(k) * sin)

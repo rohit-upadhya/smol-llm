@@ -81,6 +81,6 @@ if __name__ == "__main__":
     # )
 
     s3.download_from_uri(
-        s3_uri="s3://smol-lm-bucket/model_weights/run_2026_06_27__16_32/",
-        local_folder="resources/run_2026_06_27__16_32",
+        s3_uri="s3://smol-lm-bucket/model_weights/run_2026_06_28__13_06/checkpoint-epoch-1/",
+        local_folder="resources/SmoLLM/run_2026_06_27__16_32",
     )

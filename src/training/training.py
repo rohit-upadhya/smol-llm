@@ -26,7 +26,9 @@ class SmoLLMTrainer:
         warmup_steps: int = 2000,
         max_steps: int = 750_000,
         upload_models: bool = True,
+        check_eos: bool = True,
     ):
+        self.check_eos = check_eos
         self.upload_models = upload_models
         self.tokenizer = tokenizer
         self.device = torch.device(
@@ -70,6 +72,7 @@ class SmoLLMTrainer:
         )
 
         self.global_steps = 0
+        self.eos_token_id = self.tokenizer.tokenizer.token_to_id("[EOS]")
 
     def train_epoch(
         self,
@@ -89,6 +92,12 @@ class SmoLLMTrainer:
         for step, batch in enumerate(loop):
             self.global_steps += 1
             input_ids = batch.get("input_ids").to(self.device)
+
+            if self.check_eos:
+                n_eos = (input_ids == self.eos_token_id).sum().item()
+                tqdm.write(f"EOS discovered in batch : {n_eos}")
+                self.check_eos = False
+
             labels = batch.get("labels").to(self.device)
 
             logits = self.model(input_ids)
@@ -194,6 +203,16 @@ class SmoLLMTrainer:
                     self._empty_cache()
 
         return total_loss / valid_batches if valid_batches > 0 else float("inf")
+
+    def load_checkpoints(
+        self,
+        chckpoint_path: str,
+    ):
+        state_dict = torch.load(
+            chckpoint_path, map_location=self.device, weights_only=True
+        )
+        self.model.load_state_dict(state_dict, strict=True)
+        self.model.to(self.device)
 
     def _save_model(
         self,

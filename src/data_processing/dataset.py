@@ -15,6 +15,7 @@ class SmoLLMDataLoader:
         self.smollm_tokenizer = tokenizer
         self.max_length = max_length
         self.pad_token_id = self.smollm_tokenizer.tokenizer.token_to_id(pad_token_id)
+        self.eos_token_id = self.smollm_tokenizer.tokenizer.token_to_id("[EOS]")
 
     def __len__(
         self,
@@ -29,8 +30,7 @@ class SmoLLMDataLoader:
 
         input_ids = self.smollm_tokenizer.encode(text)
 
-        if len(input_ids) > self.max_length:
-            input_ids = input_ids[: self.max_length]
+        input_ids = input_ids[: self.max_length - 1] + [self.eos_token_id]
 
         tensor_ids = torch.tensor(input_ids, dtype=torch.long)
 
@@ -47,6 +47,7 @@ class SmoLLMIterableDataset(IterableDataset):
         self.dataset = dataset
         self.smollm_tokenizer = tokenizer
         self.max_length = max_length
+        self.eos_token_id = self.smollm_tokenizer.tokenizer.token_to_id("[EOS]")
 
     def __iter__(self):
         for item in self.dataset:
@@ -54,8 +55,7 @@ class SmoLLMIterableDataset(IterableDataset):
 
             input_ids = self.smollm_tokenizer.encode(text)
 
-            if len(input_ids) > self.max_length:
-                input_ids = input_ids[: self.max_length]
+            input_ids = input_ids[: self.max_length - 1] + [self.eos_token_id]
 
             tensor_ids = torch.tensor(input_ids, dtype=torch.long)
 

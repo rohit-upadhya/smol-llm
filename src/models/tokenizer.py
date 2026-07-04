@@ -17,6 +17,7 @@ class SmoLLMTokenizer:
 
         if os.path.exists(self.model_path):
             self.tokenizer = HFTokenizer.from_file(self.model_path)
+            self.vocab_size = self.tokenizer.get_vocab_size()
             print("Loaded Tokenizer")
         else:
             self.tokenizer = HFTokenizer(BPE(unk_token="[UNK]"))
