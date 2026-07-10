@@ -171,7 +171,7 @@ class SmoLLMRunner:
             n_heads=12,
             dim=768,
             n_layers=12,
-            lr=3e-5,
+            lr=1e-4,
             epochs=1,
             batch_size=12,
             save_model=True,
@@ -250,4 +250,8 @@ class SmoLLMRunner:
 
 if __name__ == "__main__":
     runner = SmoLLMRunner()
-    runner.continued_pretrain(model_save_dir="resources/_eos_continued_pretrain")
+    runner.continued_pretrain(
+        model_save_dir="resources/_eos_continued_pretrain_larger-lr",
+        checkpoint_path="resources/SmoLLM/run_2026_07_04__14_55/checkpoint-epoch-1/pytorch_model.bin",
+        tokenizer_path="resources/SmoLLM/run_2026_07_04__14_55/checkpoint-epoch-1/tokenizer.json",
+    )

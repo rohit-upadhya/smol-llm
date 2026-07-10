@@ -43,7 +43,9 @@ class Inference:
 
         print("Loading weights.")
 
-        weights = torch.load(self.model_name_or_path, map_location=self.device)
+        weights = torch.load(
+            self.model_name_or_path, map_location=self.device, weights_only=True
+        )
 
         self.llm.load_state_dict(weights)
 
@@ -57,6 +59,8 @@ class Inference:
         max_tokens: int = 256,
         temperature: float = 0.8,
         top_k: int = 50,
+        top_p: float = 0.95,
+        repitition_penalty: float = 1.2,
     ):
         input_ids = self.tokenizer.encode(text=prompt)
 
@@ -66,9 +70,22 @@ class Inference:
 
         with torch.no_grad():
             for _ in range(max_tokens):
+
+                if input_tensor.shape[1] >= 512:
+                    break
+
                 logits = self.llm(input_tensor)
 
                 next_token_logits = logits[:, -1, :]
+
+                if repitition_penalty != 1.0:
+                    for tok in set(input_tensor[0].tolist()):
+                        s = next_token_logits[:, tok]
+
+                        next_token_logits[:, tok] = torch.where(
+                            s < 0, s * repitition_penalty, s / repitition_penalty
+                        )
+                        pass
 
                 if temperature > 0:
                     next_token_logits = next_token_logits / temperature
@@ -78,6 +95,14 @@ class Inference:
                         next_token_logits, min(top_k, next_token_logits.size(-1))
                     )
                     next_token_logits[next_token_logits < v[:, [-1]]] = -float("inf")
+
+                if top_p < 1.0:
+                    sl, si = torch.sort(next_token_logits, descending=True)
+                    cummulative = torch.cumsum(F.softmax(sl, dim=-1), dim=-1)
+                    remove = cummulative > top_p
+                    remove[:, 1:] = remove[:, :-1].clone()
+                    remove[:, 0] = False
+                    next_token_logits[0, si[0, remove[0]]] = -float("inf")
 
                 probs = F.softmax(next_token_logits, dim=-1)
 
@@ -124,16 +149,29 @@ class Inference:
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = "resources/SmoLLM/run_2026_06_27__16_32/pytorch_model.bin"
-    TOKENIZER_PATH = "resources/SmoLLM/run_2026_06_27__16_32/tokenizer.json"
+    WEIGHTS_PATH = "resources/SmoLLM/eos/run_2026_07_04__19_35/checkpoint-epoch-1/pytorch_model.bin"
+    TOKENIZER_PATH = (
+        "resources/SmoLLM/eos/run_2026_07_04__19_35/checkpoint-epoch-1/tokenizer.json"
+    )
     if os.path.exists(WEIGHTS_PATH):
         inferencer = Inference(
             model_name_or_path=WEIGHTS_PATH, tokenizer_path=TOKENIZER_PATH
         )
 
-        prompt = "Machine Learning is "
-        output = inferencer.generate(prompt=prompt, max_tokens=50, temperature=0.0)
-        test = inferencer.probe_eos("Machine Learning is ")
+        prompt = """### Instruction: What is machine learning?
+### Response: Machine learning is a field of AI where systems learn from data. [EOS]
+#### Instruction: What is Science? """
+        output = inferencer.generate(
+            prompt=prompt,
+            max_tokens=100,
+            temperature=0.8,
+            top_p=0.90,
+            repitition_penalty=1.2,
+            top_k=50,
+        )
+        # test = inferencer.probe_eos("Machine Learning is ")
+        # inferencer.probe_eos("The capital of France is ", max_tokens=100)
+        # inferencer.probe_eos("Water is made of hydrogen and ")
         print("\n" + output)
     else:
         print(f"\tWeights arenot here : {WEIGHTS_PATH}")
