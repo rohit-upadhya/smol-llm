@@ -169,7 +169,65 @@ if __name__ == "__main__":
         # inferencer.probe_eos("The capital of France is ", max_tokens=100)
         # inferencer.probe_eos("Water is made of hydrogen and ")
         print("\n" + output)
-    else:
-        print(f"\tWeights arenot here : {WEIGHTS_PATH}")
-        print("Check the directory.")
-    pass
+
+    # import json
+
+    # questions = [
+    #     "What is machine learning?",
+    #     "What is Python?",
+    #     "Write a short poem about the ocean.",
+    #     "List three colors.",
+    #     "Explain how to make tea.",
+    #     "Who are you?",
+    #     "Why is exercise important?",
+    #     "Tell me about space.",
+    # ]
+
+    # N_SAMPLES = 10
+    # results = {}
+
+    # max_ = 5
+    # epochs = [2, 3]
+    # for i in epochs:
+    #     WEIGHTS_PATH = f"resources/SmoLLM_Instruct/run_2026_07_11__14_16/checkpoint-epoch-{i}/pytorch_model.bin"
+    #     TOKENIZER_PATH = f"resources/SmoLLM_Instruct/run_2026_07_11__14_16/checkpoint-epoch-{i}/tokenizer.json"
+    #     if os.path.exists(WEIGHTS_PATH):
+    #         inferencer = Inference(
+    #             model_name_or_path=WEIGHTS_PATH, tokenizer_path=TOKENIZER_PATH
+    #         )
+
+    #         print(f"\n{'='*70}\nEPOCH : {i}\n{'='*70}")
+
+    #         epoch_results = []
+    #         for q in questions:
+    #             prompt = f"""[SYSTEM] You are a helpful bot [/SYSTEM]\n[USER] {q} [/USER]\n[ASSISTANT] """
+
+    #             samples = []
+    #             for s in range(N_SAMPLES):
+    #                 output = inferencer.generate(
+    #                     prompt=prompt,
+    #                     max_tokens=100,
+    #                     temperature=0.8,
+    #                     top_p=0.90,
+    #                     repitition_penalty=1.2,
+    #                     top_k=50,
+    #                 )
+    #                 response = output.split("[ASSISTANT] ")[-1].strip()
+    #                 samples.append(response)
+
+    #             print(f"\nQ: {q}")
+    #             for idx, r in enumerate(samples, 1):
+    #                 print(f"  [{idx}] {r}")
+    #             print("-" * 60)
+
+    #             epoch_results.append({"question": q, "samples": samples})
+
+    #         results[f"epoch_{i}"] = epoch_results
+    #     else:
+    #         print(f"\tWeights arenot here : {WEIGHTS_PATH}")
+    #         print("Check the directory.")
+
+    # out_path = "resources/instruct_eval_results.json"
+    # with open(out_path, "w") as f:
+    #     json.dump(results, f, indent=4, ensure_ascii=False)
+    # print(f"\nSaved results -> {out_path}")
