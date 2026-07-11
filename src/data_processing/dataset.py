@@ -88,12 +88,75 @@ class SmoLLMCollate:
         }
 
 
+class SmoLLMInstructDataset:
+    def __init__(
+        self,
+        dataset,
+        tokenizer,
+        max_length: int = 512,
+        pad_token_id: str = "[PAD]",
+    ):
+        self.dataset = dataset
+        self.smollm_tokenizer = tokenizer
+        self.max_length = max_length
+        self.pad_token_id = self.smollm_tokenizer.tokenizer.token_to_id(pad_token_id)
+        self.eos_token_id = self.smollm_tokenizer.tokenizer.token_to_id("[EOS]")
+
+    def __getitem__(
+        self,
+        key,
+    ):
+        example = self.dataset[key]
+
+        prompt_str, response = self._format_prompt(example=example)
+
+        prompt_ids = self.smollm_tokenizer.encode(prompt_str)
+
+        response_ids = self.smollm_tokenizer.encode(response) + [self.eos_token_id]
+
+        input_ids = prompt_ids + response_ids
+
+        input_ids = input_ids[: self.max_length]
+
+        labels = [-100] * len(prompt_ids) + response_ids
+
+        labels = labels[: self.max_length]
+
+        return {
+            "input_ids": torch.tensor(input_ids, dtype=torch.long),
+            "labels": torch.tensor(labels, dtype=torch.long),
+        }
+
+    def _format_prompt(
+        self,
+        example: dict,
+    ):
+        instruction = example.get("instruction", "")
+        context = example.get("context", None)
+        response = example.get("response", "")
+
+        if context:
+            user_message = f"[USER] {instruction} \n\n {context} [/USER]"
+        else:
+            user_message = f"[USER] {instruction} [/USER]"
+
+        return (
+            f"[SYSTEM] You are a helpful bot [/SYSTEM]\n"
+            f"{user_message}\n"
+            "[ASSISTANT] "
+        ), response
+
+    def __len__(self):
+        return len(self.dataset)
+
+
 def create_dateset(
     dataset,
     tokenizer,
     max_length: int = 512,
     batch_size: int = 8,
     shuffle: bool = True,
+    instruct: bool = False,
 ):
     pad_id = tokenizer.tokenizer.token_to_id("[PAD]")
     collate_fn = SmoLLMCollate(pad_token_id=pad_id)
@@ -117,12 +180,19 @@ def create_dateset(
             collate_fn=collate_fn,
         )
     else:
-        final_dataset = SmoLLMDataLoader(
-            dataset=dataset,
-            tokenizer=tokenizer,
-            max_length=max_length,
-            pad_token_id="[PAD]",
-        )
+        if instruct:
+            final_dataset = SmoLLMInstructDataset(
+                dataset=dataset,
+                tokenizer=tokenizer,
+                max_length=max_length,
+            )
+        else:
+            final_dataset = SmoLLMDataLoader(
+                dataset=dataset,
+                tokenizer=tokenizer,
+                max_length=max_length,
+                pad_token_id="[PAD]",
+            )
         return DataLoader(
             final_dataset,
             batch_size=batch_size,

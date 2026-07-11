@@ -1,8 +1,10 @@
 from typing import Optional
+from datasets import load_dataset
 
 from src.data_processing.dataset import create_dateset
 from src.models.tokenizer import SmoLLMTokenizer
 from src.data_processing.hf_data_download import DataDownload
+from src.data_processing.dataset import SmoLLMInstructDataset, SmoLLMCollate
 from src.models.models import SmoLLM
 from src.training.training import SmoLLMTrainer
 
@@ -26,6 +28,7 @@ class SmoLLMRunner:
         model_save_dir: Optional[str] = None,
         upload_models: bool = True,
         checkpoint_path: Optional[str] = None,
+        instruct: bool = False,
     ):
         self.batch_size = batch_size
         self.docs_to_take = docs_to_take
@@ -38,23 +41,42 @@ class SmoLLMRunner:
             tokenizer.load_or_train(hf_dataset=train_data)
         pad_token_id = tokenizer.tokenizer.token_to_id("[PAD]")
 
-        total_batches = self.docs_to_take // self.batch_size
+        if instruct:
+            train_loader = create_dateset(
+                train_data,
+                tokenizer,
+                batch_size=batch_size,
+                shuffle=True,
+                instruct=True,
+            )
+            test_loader = create_dateset(
+                test_data,
+                tokenizer,
+                batch_size=batch_size,
+                shuffle=False,
+                instruct=True,
+            )
+
+            total_batches = len(train_loader)
+
+        else:
+            train_loader = create_dateset(
+                dataset=train_data,
+                tokenizer=tokenizer,
+                shuffle=False,
+                batch_size=batch_size,
+            )
+
+            test_loader = create_dateset(
+                dataset=test_data,
+                tokenizer=tokenizer,
+                shuffle=True,
+                batch_size=batch_size,
+            )
+
+            total_batches = self.docs_to_take // self.batch_size
         max_steps = (total_batches // self.accumulation_steps) * self.epochs
         warmup_steps = int(max_steps * 0.05)
-
-        train_loader = create_dateset(
-            dataset=train_data,
-            tokenizer=tokenizer,
-            shuffle=False,
-            batch_size=batch_size,
-        )
-
-        test_loader = create_dateset(
-            dataset=test_data,
-            tokenizer=tokenizer,
-            shuffle=True,
-            batch_size=batch_size,
-        )
 
         print(f"Number of Test Batches: {len(test_loader)}")
 
@@ -89,6 +111,40 @@ class SmoLLMRunner:
             train_dataloader=train_loader,
             test_dataloader=test_loader,
             epochs=epochs,
+        )
+
+    def instruct_tune(
+        self,
+        checkpoint_path: str,
+        tokenizer_path: str,
+        model_save_dir: str,
+        test_run: bool = False,
+    ):
+        raw = load_dataset("databricks/databricks-dolly-15k", split="train")
+        split = raw.train_test_split(test_size=500, seed=42)
+        train_data, val_data = split["train"], split["test"]
+        epoch = 5
+        if test_run:
+            train_data = train_data.select(range(256))
+            val_data = val_data.select(range(64))
+            epoch = 10
+        self._execute_pipeline(
+            train_data=train_data,
+            test_data=val_data,
+            n_heads=12,
+            dim=768,
+            n_layers=12,
+            lr=2e-5,
+            epochs=epoch,
+            batch_size=8,
+            save_model=True,
+            accumulation_steps=4,
+            checkpoint_path=checkpoint_path,
+            tokenizer_path=tokenizer_path,
+            model_save_dir=model_save_dir,
+            save_every_n_steps=10_000_000,
+            upload_models=True,
+            instruct=True,
         )
 
     def main(
@@ -250,8 +306,9 @@ class SmoLLMRunner:
 
 if __name__ == "__main__":
     runner = SmoLLMRunner()
-    runner.continued_pretrain(
-        model_save_dir="resources/_eos_continued_pretrain_larger-lr",
-        checkpoint_path="resources/SmoLLM/run_2026_07_04__14_55/checkpoint-epoch-1/pytorch_model.bin",
-        tokenizer_path="resources/SmoLLM/run_2026_07_04__14_55/checkpoint-epoch-1/tokenizer.json",
+    runner.instruct_tune(
+        model_save_dir="resources/SmoLLM-100M-Instruct_test",
+        checkpoint_path="resources/SmoLLM/eos/run_2026_07_04__19_35/checkpoint-epoch-1/pytorch_model.bin",
+        tokenizer_path="resources/SmoLLM/eos/run_2026_07_04__19_35/checkpoint-epoch-1/tokenizer.json",
+        test_run=True,
     )

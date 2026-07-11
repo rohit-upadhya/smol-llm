@@ -149,18 +149,14 @@ class Inference:
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = "resources/SmoLLM/eos/run_2026_07_04__19_35/checkpoint-epoch-1/pytorch_model.bin"
-    TOKENIZER_PATH = (
-        "resources/SmoLLM/eos/run_2026_07_04__19_35/checkpoint-epoch-1/tokenizer.json"
-    )
+    WEIGHTS_PATH = "resources/SmoLLM-100M-Instruct_test/run_2026_07_11__18_22/checkpoint-epoch-3/pytorch_model.bin"
+    TOKENIZER_PATH = "resources/SmoLLM-100M-Instruct_test/run_2026_07_11__18_22/checkpoint-epoch-3/tokenizer.json"
     if os.path.exists(WEIGHTS_PATH):
         inferencer = Inference(
             model_name_or_path=WEIGHTS_PATH, tokenizer_path=TOKENIZER_PATH
         )
 
-        prompt = """### Instruction: What is machine learning?
-### Response: Machine learning is a field of AI where systems learn from data. [EOS]
-#### Instruction: What is Science? """
+        prompt = """[SYSTEM] You are a helpful bot [/SYSTEM]\n[USER] What is machine learning? [/USER]\n[ASSISTANT] """
         output = inferencer.generate(
             prompt=prompt,
             max_tokens=100,
